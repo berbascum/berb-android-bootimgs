@@ -1,0 +1,35 @@
+## 2024-05-12:
+## Editing boot images with yabit is NOT working
+## Editing boot images with abootimg is NOT working
+## Editing boot images with mkbootimg is WORKING
+## Editing boot images with magiskboot is WORKING
+
+## Working process ##
+# For unpacking i'm using magiskboot:
+  - magiskboot unpack -n boot-orig.img  # I'm using -n since i don't want decompress the kernel and initram images 
+# For packing i'm using mkbootimg using my shell script frontend which supplies all offsets and version arguments
+  - berb-bootimg-mkbootimg-creator-<device_target>.sh
+
+## mkbootimg ##
+The version in Debian Bookworm repository works fine
+USEFULL:
+- Create a boot image from scratch. All the offset tipes can be specified as arguments, including the header_version nd dtb offset.
+- Can edit the cmdline.
+WORKING: The resuling imge boots fine.
+
+## magiskboot ##
+Usefull to extract boot.img, but also acan repack
+"repack" works fine and the output img boots
+LIMITATIONS: Can not edit the cmdline
+- Unpack the bootimg:
+  - magiskboot unpack [-n to not deompress images] boot-orig.img 
+- Repack the bootimg:
+  - Will repack original img, replace the files with the ones found in current dir, and creates a new image.
+  - If the files are compressed, they will be added directly.
+  - If the files are uncompressed, they will be compressed detecting the compression type from the original img.
+  - if PATCHVBMETAFLAG is set to true, all disable flags in the boot image's vbmeta header will be set.
+  - magiskboot repack [-n to not recompress images] boot-orig.img boot-new.img 
+- Merge dtb + kernel?
+  -magiskboot split <image-dtb>
+- Print dtb image
+  - magiskboot-arm64 dtb dtb-image print
