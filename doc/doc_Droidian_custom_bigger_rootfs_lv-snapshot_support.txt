@@ -1,0 +1,69 @@
+### ENABLE LV SNAPSHOTS by resizing image to 4500MB and reserve space
+
+#### Get data from global droidian rootfs image
+     - Download droidian generic nightly image (not device speciphic)
+     - losetup -f rootfs.img
+     - vgchange -ay droidian
+     - mount /dev/droidian/droidia-rootfs /rootfs_mountpoint
+     - Create tar from mouted image
+     - umount /rootfs_mountpoint
+     - losetup -d /dev/block/loopXX
+#### Get userdata image from vayu specific firmware
+     - Extract it
+     - The image is in sparse format. Need to convert to raw
+     - simg2img userdata.img userdata-raw.img
+     - mv userdata-raw.img userdata-vayu-custom-20240421_1-raw.img
+#### Extend de raw image (optional)
+     - qemu-utils are required
+     - qemu-img resize <image-file> +1G
+     - losetup -f <image>
+     - vgchange -an droidian
+     - pvresize /dev/block/loopXX
+     - lvresize /dev/droidian/droidian-rootfs -l +100%FREE
+     - e2fsck -f /dev/droidian/droidian-rootfs
+     - resize2fs /dev/droidian/droidian-rootfs
+     - sync
+     - vgchange -an droidian
+     - losetup -d /dev/block/loopXX
+#### Muntar imatge raw definitiva
+     - losetup -f <image>
+     - vgchange -ay droidian
+     - mount /dev/droidian/droidian-rootfs /mount_point
+     - Restaurar el tar creat del firmware Global de Droidian
+     - Descomprimir l'adaptation de vayu
+     - cd droidian-rootfs lv mountpoint
+     - tar xvf ../custom-userdata-img/adaptation-vayu/payload.tar
+     - Desmuntar
+     - vgchange -an droidian
+     - losetup -d /dev/block/loopXX
+#### Flash de la imatge per recovery amb dd
+
+
+
+
+
+#### OBSOLET ##### rootfs image recreation to 4,5 GB
+     - dd if=/dev/urandom of=droidian-userdata-big.img bs=1M count=4500 status=progress
+     - fdisk droidian-userdata-big.img
+       - 'o'
+       - 'w'
+     - losetup -f droidian-userdata-big.img
+     - pvcreate /dev/block/loopX
+     - vgcreate droidian /dev/block/loopX
+     - lvcreate -n droidian-reserved -L 32M droidian
+     - lvcreate -n droidian-persistent -L 32M droidian
+     - lvcreate -n droidian-snpshts-reserved -L 500M droidian
+     - lvcreate -n droidian-rootfs -l +100%FREE droidian
+     - mkfs.ext4 /dev/droidian/droidian-rootfs
+     - mount /dev/droidian/droidian-rootfs media/droidian-rootfs
+     - cd media/droidian-rootfs
+     - tar zxvf <file.tar>
+     - dd if=droidian-lvs-raws/droidian-reserved.img of=/dev/droidian/droidian-reserved status=progress
+     - dd if=droidian-lvs-raws/droidian-persistent.img of=/dev/droidian/droidian-persistent status=progress
+     - sync
+     - vgchange -an droidian
+     -losetup -d /dev/block/loopX
+
+
+
+     32MB reserved and persistent volumes

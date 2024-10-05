@@ -1,3 +1,7 @@
+## UTILS invest
+https://github.com/osm0sis/Android-Image-Kitchen/tree/AIK-Linux
+
+
 ## 2024-05-12:
 ## Editing boot images with yabit is NOT working
 ## Editing boot images with abootimg is NOT working
@@ -6,10 +10,19 @@
 
 ## Working process ##
 # For unpacking i'm using magiskboot:
-  - magiskboot unpack -n boot-orig.img  # I'm using -n since i don't want decompress the kernel and initram images 
+  - magiskboot unpack -n boot-orig.img  # I'm using -n since i don't want uncompress kernel and initram images 
 # For packing i'm using mkbootimg using my shell script frontend which supplies all offsets and version arguments
-  - berb-bootimg-mkbootimg-creator-<device_target>.sh
+  - berb-bootimg-mkbootimg-creator.sh
+# For build the initrm image i'm using cpio
+  ## With cpio 2.13 the resulting initram file is not bootable. Use 2.12/2.15? instead.
+  ## cpio find . | cpio -o -R 0:0 --format='newc' -D ${in_dir} | gzip -9 > ${out_dir}/${out_file}
+     ## [--dereference?]
 
+
+
+#######################
+## Utils description ##
+#######################
 ## mkbootimg ##
 The version in Debian Bookworm repository works fine
 USEFULL:
