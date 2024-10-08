@@ -73,7 +73,7 @@ fn_mkboot_conf_global() {
 fn_initram_get_skel() {
     ## Check that initram extracted dir exists
     [ -e "${EXTRACTED_INITRAM_DIR}" ] && \
-        mv "${EXTRACTED_INITRAM_DIR}" "${EXTRACTED_INITRAM_DIR}_$(date +(%y%m%d_%H%M%S))"
+        mv ${EXTRACTED_INITRAM_DIR} ${EXTRACTED_INITRAM_DIR}_$(date +%y%m%d_%H%M%S)
     [ -e "${EXTRACTED_INITRAM_DIR}" ] || \
         mkdir "${EXTRACTED_INITRAM_DIR}"
     tmpdir=$(mktemp -d)
@@ -81,6 +81,8 @@ fn_initram_get_skel() {
     wget -q -O ${tmpdir}/${INITRAM_SKEL_IMG} ${INITRAM_SKEL_URL}/${INITRAM_SKEL_IMG}
     cd "${EXTRACTED_INITRAM_DIR}"
     gunzip -c ${tmpdir}/${INITRAM_SKEL_IMG} | cpio -i
+    exit
+
     rm -f "${tmpdir}/${INITRAM_SKEL_IMG}"
     echo "Downloading initram boot scripts..."
     cd "${tmpdir}"
