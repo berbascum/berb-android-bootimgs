@@ -1,7 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-Upstream-Name: berb-android-bootimgs-develop
-Source: https://gitlab.com/berbascum/berb-android-bootimgs-develop
-Source: https://git.ticv.cat/berbascum/berb-android-bootimgs-develop
+Upstream-Name: berb-android-bootimgs-tools
+Source: https://github.com/berbascum/berb-android-bootimgs-tools
 
 Files: *
 Copyright (c) 2024, berbascum <berbascum@ticv.cat>
