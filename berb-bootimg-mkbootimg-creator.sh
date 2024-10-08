@@ -17,14 +17,12 @@
 ## initram repack
 ## ./berb-bootimg-mkbootimg-creator.sh vayu droidian-booitmg-develop/extracted-boot-vayu/ droidian initram-repack
 
-tools_dir="tools"
+
 target_os="droidian"
-input_mkboot_dir="droidian-booitmg-develop/mkboot-files"
-kernel="kernel"
-initrd="ramdisk.cpio"
-dtb="dtb"
+kernel_release="${target_os}3-rc4"
 
-
+tools_dir="tools"
+input_mkboot_dir="${target_os}-booitmg-develop/mkboot-files"
 
 abort() {
     echo
@@ -36,10 +34,18 @@ message() {
     echo "$*"
 }
 
-
 ## device_target required
 device_target="$1"
 [ -z "${device_target}" ] && abort "A device target name is required as 1st script arg"
+
+## Set action var
+action="$2"
+
+# Names are based on magiskboot defaults
+kernel="kernel-${device_target}-${kernel_release}"
+initrd="ramdisk.cpio-${device_target}-${kernel_release}"
+dtb="dtb-${device_target}-${kernel_release}"
+
 
 ## Device mkbootimg config file required
 [ -e "./mkbootimg-config-${device_target}.sh" ] \
@@ -47,14 +53,11 @@ device_target="$1"
     || abort "Device config file missing"
 
 
-## Set action var
-action="$2"
-
 ## Global vars
 fn_vars_set_img_conf() {
     ## Arguments definition for mkbootimg
     ## Paths
-    MKBOOTIMG_OUT_IMG="boot-berb-${target_os}-${device_target}.img"
+    MKBOOTIMG_OUT_IMG="boot-berb-${target_os}-${device_target}-${kernel_release}.img"
     ## kernel
     MKBOOTIMG_KERNEL_ARG="--kernel ${input_mkboot_dir}/${kernel}"
     MKBOOTIMG_KERNEL_OFFSET_ARG="--kernel_offset $KERNEL_OFFSET"
@@ -108,20 +111,20 @@ fn_initram_repack() {
 
     ## Paths definition
     START_DIR=$(pwd)
-    in_dir="droidian-booitmg-develop/extracted-initram"
-    out_dir="droidian-booitmg-develop/initrd-images"
-    out_file="ramdisk.cpio-berb.gz"
+    extracted_initram_dir="droidian-booitmg-develop/extracted-initram"
+    out_initram_dir="${input_mkboot_dir}"
+    out_initram_file="${initrd}"
     ## Check that initram extracted dir exists
-    [ -e "${in_dir}/scripts/functions" ] || abort "The extracted initram dir not exist!"
-    cd ${in_dir}
+    [ -e "${extracted_initram_dir}/scripts/functions" ] || abort "The extracted initram dir not exist!"
+    cd ${extracted_initram_dir}
     echo && echo "Creating initramfs imatge with cpio..."
     # cpio [--dereference?]
     ## Build initram image
-
-    sudo rm ${START_DIR}/${input_mkboot_dir}/${initrd}
-    sudo find . | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${START_DIR}/${input_mkboot_dir}/${initrd}
+    sudo rm ${START_DIR}/${input_mkboot_dir}/${out_initram_file}
+    #sudo find ./ -not -path "./.git/*" | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${START_DIR}/${input_mkboot_dir}/${out_initram_file}
+    sudo find . | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${START_DIR}/${input_mkboot_dir}/${out_initram_file}
     #sudo cp -av "${out_file}" "${initrd}"
-    echo && echo "${START_DIR}/${input_mkboot_dir}/${initrd} created"
+    echo && echo "${START_DIR}/${input_mkboot_dir}/${out_initram_file} created"
 }
 
 #fn_images_to_include_search() {
