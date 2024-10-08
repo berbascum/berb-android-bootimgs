@@ -70,6 +70,27 @@ fn_mkboot_conf_global() {
     MKBOOTIMG_OUT_IMG_ARG="-o ${INPUT_MKBOOT_DIR}/${MKBOOTIMG_OUT_IMG}"
 }
 
+fn_initram_get_skel() {
+    ## Check that initram extracted dir exists
+    [ -e "${EXTRACTED_INITRAM_DIR}" ] && \
+        mv "${EXTRACTED_INITRAM_DIR}" "${EXTRACTED_INITRAM_DIR}_$(date +(%y%m%d_%H%M%S))"
+    [ -e "${EXTRACTED_INITRAM_DIR}" ] || \
+        mkdir "${EXTRACTED_INITRAM_DIR}"
+    tmpdir=$(mktemp -d)
+    echo "Downloading ${INITRAM_SKEL_IMG}..."
+    wget -q -O ${tmpdir}/${INITRAM_SKEL_IMG} ${INITRAM_SKEL_URL}/${INITRAM_SKEL_IMG}
+    cd "${EXTRACTED_INITRAM_DIR}"
+    gunzip -c ${tmpdir}/${INITRAM_SKEL_IMG} | cpio -i
+    rm -f "${tmpdir}/${INITRAM_SKEL_IMG}"
+    echo "Downloading initram boot scripts..."
+    cd "${tmpdir}"
+    git clone -b ${INITRAM_BOOTSCRIPTS_URL}/${INITRAM_BOOTSCRIPTS_BRANCH}
+    rm -rf initramfs-droidian-boot-scripts/.git
+    cp -av initramfs-droidian-boot-scripts/* ${EXTRACTED_INITRAM_DIR}
+    cd "${START_DIR}"
+    rm -rf ${tmpdir}
+}
+
 fn_initram_unpack() {
 ## TODO
      initram="$(echo ${initram} | awk -F'.' '{print $1}')"

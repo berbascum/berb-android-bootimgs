@@ -5,6 +5,10 @@
 TARGET_OS="droidian"
 ARCH_TARGET="arm64"
 KERNEL_RELEASE="${TARGET_OS}3-rc4"
+INITRAM_SKEL_URL="https://github.com/droidian-berb/initramfs-droidian-skels"
+INITRAM_SKEL_IMG="initramfs-droidian-bookworm-nominienv-arm64-skel_v2"
+INITRAM_BOOTSCRIPTS_URL="https://github.com/droidian-berb/initramfs-droidian-boot-scripts"
+INITRAM_BOOTSCRIPTS_BRANCH="sid"
 
 # Names are based on magiskboot defaults
 kernel="kernel-${DEVICE_TARGET}-${KERNEL_RELEASE}"
