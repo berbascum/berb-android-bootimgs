@@ -80,13 +80,12 @@ fn_initram_get_skel() {
     echo "Downloading ${INITRAM_SKEL_IMG}..."
     wget -q -O ${tmpdir}/${INITRAM_SKEL_IMG} ${INITRAM_SKEL_URL}/${INITRAM_SKEL_IMG}
     cd "${EXTRACTED_INITRAM_DIR}"
+    echo "Extracting the initram skel..."
     gunzip -c ${tmpdir}/${INITRAM_SKEL_IMG} | cpio -i
-    exit
-
     rm -f "${tmpdir}/${INITRAM_SKEL_IMG}"
     echo "Downloading initram boot scripts..."
     cd "${tmpdir}"
-    git clone -b ${INITRAM_BOOTSCRIPTS_URL}/${INITRAM_BOOTSCRIPTS_BRANCH}
+    git clone -b ${INITRAM_BOOTSCRIPTS_BRANCH} ${INITRAM_BOOTSCRIPTS_URL}
     rm -rf initramfs-droidian-boot-scripts/.git
     cp -av initramfs-droidian-boot-scripts/* ${EXTRACTED_INITRAM_DIR}
     cd "${START_DIR}"
