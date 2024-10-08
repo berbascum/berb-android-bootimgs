@@ -4,6 +4,7 @@
 
 TARGET_OS="droidian"
 ARCH_TARGET="arm64"
+SUITE_INITRAM="bookworm"
 KERNEL_RELEASE="${TARGET_OS}3-rc4"
 INITRAM_SKEL_URL="https://github.com/droidian-berb/initramfs-droidian-skels/raw/refs/heads/droidian"
 INITRAM_SKEL_IMG="initramfs-droidian-bookworm-nominienv-arm64-skel_v2"
@@ -12,7 +13,7 @@ INITRAM_BOOTSCRIPTS_BRANCH="sid"
 
 # Names are based on magiskboot defaults
 kernel="kernel-${DEVICE_TARGET}-${KERNEL_RELEASE}"
-initram="ramdisk-${TARGET_OS}-${SUITE}-${ARCH}.cpio"
+initram="ramdisk-${TARGET_OS}-${SUITE_INITRAM}-${ARCH_TARGET}.cpio"
 dtb="dtb-${DEVICE_TARGET}-${KERNEL_RELEASE}"
 
 MKBOOTIMG_OUT_IMG="boot-berb-${TARGET_OS}-${DEVICE_TARGET}-${KERNEL_RELEASE}.img"
