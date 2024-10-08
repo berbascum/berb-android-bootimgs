@@ -87,7 +87,7 @@ fn_initram_get_skel() {
     cd "${tmpdir}"
     git clone -b ${INITRAM_BOOTSCRIPTS_BRANCH} ${INITRAM_BOOTSCRIPTS_URL}
     rm -rf initramfs-droidian-boot-scripts/.git
-    cp -av initramfs-droidian-boot-scripts/* ${EXTRACTED_INITRAM_DIR}
+    cp -av initramfs-droidian-boot-scripts/* ${START_DIR}/${EXTRACTED_INITRAM_DIR}
     cd "${START_DIR}"
     rm -rf ${tmpdir}
 }
