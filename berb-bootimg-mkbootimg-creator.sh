@@ -18,11 +18,7 @@
 ## ./berb-bootimg-mkbootimg-creator.sh vayu droidian-booitmg-develop/extracted-boot-vayu/ droidian initram-repack
 
 
-target_os="droidian"
-kernel_release="${target_os}3-rc4"
-
-tools_dir="tools"
-input_mkboot_dir="${target_os}-booitmg-develop/mkboot-files"
+START_DIR=$(pwd)
 
 abort() {
     echo
@@ -34,40 +30,35 @@ message() {
     echo "$*"
 }
 
-## device_target required
-device_target="$1"
-[ -z "${device_target}" ] && abort "A device target name is required as 1st script arg"
+## DEVICE_TARGET required
+DEVICE_TARGET="$1"
+if [ -z "${DEVICE_TARGET}" ]; then
+   abort "A device target name is required as 1st script arg"
+else
+    echo "Device selected: $1"
+fi
+
+## Device mkbootimg config file required
+[ -e "./mkbootimg-config-${DEVICE_TARGET}.sh" ] ||  abort "Device config file missing"
+source ./mkbootimg-config-${DEVICE_TARGET}.sh
 
 ## Set action var
 action="$2"
 
-# Names are based on magiskboot defaults
-kernel="kernel-${device_target}-${kernel_release}"
-initrd="ramdisk.cpio-${device_target}-${kernel_release}"
-dtb="dtb-${device_target}-${kernel_release}"
-
-
-## Device mkbootimg config file required
-[ -e "./mkbootimg-config-${device_target}.sh" ] \
-    && source ./mkbootimg-config-${device_target}.sh \
-    || abort "Device config file missing"
-
-
 ## Global vars
-fn_vars_set_img_conf() {
+fn_mkboot_conf_global() {
     ## Arguments definition for mkbootimg
     ## Paths
-    MKBOOTIMG_OUT_IMG="boot-berb-${target_os}-${device_target}-${kernel_release}.img"
     ## kernel
-    MKBOOTIMG_KERNEL_ARG="--kernel ${input_mkboot_dir}/${kernel}"
+    MKBOOTIMG_KERNEL_ARG="--kernel ${INPUT_MKBOOT_DIR}/${kernel}"
     MKBOOTIMG_KERNEL_OFFSET_ARG="--kernel_offset $KERNEL_OFFSET"
     MKBOOTIMG_TAGS_OFFSET_ARG="--tags_offset $TAGS_OFFSET"
     MKBOOTIMG_OS_PATCH_LVL_ARG="--os_patch_level ${OS_PATCH_LVL}"
     ## dtb
-    MKBOOTIMG_DTB_ARG="--dtb ${input_mkboot_dir}/${dtb}"
+    MKBOOTIMG_DTB_ARG="--dtb ${INPUT_MKBOOT_DIR}/${dtb}"
     MKBOOTIMG_DTB_OFFSET_ARG="--dtb_offset $DTB_OFFSET"
     ## ramdisk
-    MKBOOTIMG_RAMDISK_ARG="--ramdisk ${input_mkboot_dir}/${initrd}"
+    MKBOOTIMG_RAMDISK_ARG="--ramdisk ${INPUT_MKBOOT_DIR}/${initram}"
     MKBOOTIMG_RAMDISK_OFFSET_ARG="--ramdisk_offset $INITRAMFS_OFFSET"
     ## other offssets
     MKBOOTIMG_BASE_ARG="--base $BASE_OFFSET"
@@ -76,24 +67,23 @@ fn_vars_set_img_conf() {
     ## Boot config
     MKBOOTIMG_CMDLINE_ARG="--cmdline \"$KERNEL_BOOTIMAGE_CMDLINE\""
     MKBOOTIMG_HEADER_VER_ARG="--header_version $KERNEL_BOOTIMAGE_VERSION"
-    MKBOOTIMG_OUT_IMG_ARG="-o ${input_mkboot_dir}/${MKBOOTIMG_OUT_IMG}"
+    MKBOOTIMG_OUT_IMG_ARG="-o ${INPUT_MKBOOT_DIR}/${MKBOOTIMG_OUT_IMG}"
 }
-
-
 
 fn_initram_unpack() {
 ## TODO
-     initrd="$(echo ${initrd} | awk -F'.' '{print $1}')"
-    file_is_compressed=$(file ${initrd} | grep -c "gzip")
+     initram="$(echo ${initram} | awk -F'.' '{print $1}')"
+    file_is_compressed=$(file ${initram} | grep -c "gzip")
     if [ "${file_is_compressed}" -eq "1" ]; then
-        initrd="${initrd}.gz"
-        gunzip "${initrd}"
+        initram="${initram}.gz"
+        gunzip "${initram}"
     fi
-    cd ${input_mkboot_dir}
+    cd ${INPUT_MKBOOT_DIR}
 }
 
-fn_initram_repack() {
-## With cpio 2.13, the resulting initram file i not able to boot on (some?) Android devices. 2.15 should be used.
+fn_cpio_version_check() {
+    ## cpio 2.13: non bootable on (some?) Android devices
+    ## Use 2.12 or 2.15 ir recomendeed
     cpio_found="$(which cpio)"
     [ -n "${cpio_found}" ] && cpio_version="$(cpio --version | head -n 1 | awk '{print $4}')"
     [ "${cpio_version}" == "2.13" ] && cpio_wrong_ver="True" && message "cpio-2.13 detected, but not recomended!"
@@ -101,30 +91,27 @@ fn_initram_repack() {
         echo; echo "Searching for a valid cpio precompiled binary..."
         host_arch="$(uname -m)"
         cpio_bin_found=""
-        for file in $(find ./${tools_dir} -maxdepth 1 -name "cpio-*"); do
+        for file in $(find ./${TOOLS_DIR} -maxdepth 1 -name "cpio-*"); do
             file="$(basename ${file})"
-            bin_arch="$(file ./${tools_dir}/${file} | awk -F',' '{print $2}' | awk '{print $2}')"
+            bin_arch="$(file ./${TOOLS_DIR}/${file} | awk -F',' '{print $2}' | awk '{print $2}')"
             [ "${bin_arch}" == "${host_arch}" ] && cpio_bin="${file}" && cpio_bin_found="True" && break
         done
         [ "${cpio_bin_found}" == "True" ] && message "cpio ${file} selected!" || abort "No vaiid cpio bin found!"
     fi
+}
 
-    ## Paths definition
-    START_DIR=$(pwd)
-    extracted_initram_dir="droidian-booitmg-develop/extracted-initram"
-    out_initram_dir="${input_mkboot_dir}"
-    out_initram_file="${initrd}"
+fn_initram_repack() {
     ## Check that initram extracted dir exists
-    [ -e "${extracted_initram_dir}/scripts/functions" ] || abort "The extracted initram dir not exist!"
-    cd ${extracted_initram_dir}
+    [ -e "${EXTRACTED_INITRAM_DIR}" ] || abort "The extracted initram dir not exist!"
+    out_initram_dir="${INPUT_MKBOOT_DIR}"
+    out_initram_file="${initram}"
+    cd ${EXTRACTED_INITRAM_DIR}
     echo && echo "Creating initramfs imatge with cpio..."
     # cpio [--dereference?]
     ## Build initram image
-    sudo rm ${START_DIR}/${input_mkboot_dir}/${out_initram_file}
-    #sudo find ./ -not -path "./.git/*" | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${START_DIR}/${input_mkboot_dir}/${out_initram_file}
-    sudo find . | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${START_DIR}/${input_mkboot_dir}/${out_initram_file}
-    #sudo cp -av "${out_file}" "${initrd}"
-    echo && echo "${START_DIR}/${input_mkboot_dir}/${out_initram_file} created"
+    sudo rm -f ${START_DIR}/${INPUT_MKBOOT_DIR}/${out_initram_file}
+    find ./ -not -path "./.git/*" | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${START_DIR}/${out_initram_dir}/${out_initram_file}
+    echo && echo "${START_DIR}/${out_initram_dir}/${out_initram_file} created"
 }
 
 #fn_images_to_include_search() {
@@ -133,13 +120,14 @@ fn_initram_repack() {
 
 fn_mkbootimg() {
 ## Check the boot files dir
-[ ! -d "${input_mkboot_dir}" ] && abort "Dir with the files to include in the boot image not found"
+    [ -d "${INPUT_MKBOOT_DIR}" ] || \
+        abort "Dir ${INPUT_MKBOOT_DIR} not found!"
     ## Image creation
-    sudo rm ${input_mkboot_dir}/${MKBOOTIMG_OUT_IMG}
-    echo; echo "Creating \" ${input_mkboot_dir}/${MKBOOTIMG_OUT_IMG} \" boot image..."
-    [ -e "${input_mkboot_dir}/${kernel}" ] || abort "The image file \"${kernel}\" does not eist!" #&& echo "benne"
-    [ -e "${input_mkboot_dir}/${initrd}" ] || abort "The image file \"${initrd}\" does not eist!" #&& echo "benne"
-    [ -e "${input_mkboot_dir}/${dtb}" ] || abort "The image file \"${dtb}\" does not eist!" #&& echo "benne"
+    sudo rm ${INPUT_MKBOOT_DIR}/${MKBOOTIMG_OUT_IMG}
+    echo; echo "Creating \" ${INPUT_MKBOOT_DIR}/${MKBOOTIMG_OUT_IMG} \" boot image..."
+    [ -e "${INPUT_MKBOOT_DIR}/${kernel}" ] || abort "The image file \"${kernel}\" does not eist!" #&& echo "benne"
+    [ -e "${INPUT_MKBOOT_DIR}/${initram}" ] || abort "The image file \"${initram}\" does not eist!" #&& echo "benne"
+    [ -e "${INPUT_MKBOOT_DIR}/${dtb}" ] || abort "The image file \"${dtb}\" does not eist!" #&& echo "benne"
     eval mkbootimg \
 	${MKBOOTIMG_KERNEL_ARG} \
 	${MKBOOTIMG_DTB_ARG} \
@@ -158,18 +146,22 @@ fn_mkbootimg() {
 
 
 ## Script execution
-fn_vars_set_img_conf
+fn_mkboot_conf_global
 if [ "${action}" == "build-initram" ]; then
+    fn_cpio_version_check
     fn_initram_repack
 elif [ "${action}" == "build-boot" ]; then
     fn_mkbootimg
 elif [ "${action}" == "build-all" ]; then
     fn_initram_repack
     fn_mkbootimg
+elif [ "${action}" == "initram-get-skel" ]; then
+    fn_initram_get_skel
 else
-    echo; echo "An action should be specified s 2th script argument!"
+    echo; echo "An action should be specified s 2nd script argument!"
     echo; echo "Valid actions:"
-    echo "  \" build-all     \": Do a initram repack and builds the boot image."
-    echo "  \" build-boot    \": Builds the boot image with the files in exttracted-boot dir."
+    echo "  \" build-all \": Do a initram repack and builds the boot image."
+    echo "  \" build-boot \": Builds the boot image with the files in exttracted-boot dir."
     echo "  \" build-initram \": Repacks the initram using the content on extracted-boot/extracted-ramdisk"
+    echo "  \" initram-get-skel \": Downloads a initramfs image as template and updates the boot scripts"
 fi
