@@ -92,17 +92,6 @@ fn_initram_get_skel() {
     rm -rf ${tmpdir}
 }
 
-fn_initram_uncompress() {
-## TODO
-     initram="$(echo ${initram} | awk -F'.' '{print $1}')"
-    file_is_compressed=$(file ${initram} | grep -c "gzip")
-    if [ "${file_is_compressed}" -eq "1" ]; then
-        initram="${initram}.gz"
-        gunzip "${initram}"
-    fi
-    cd ${INPUT_MKBOOT_DIR}
-}
-
 fn_cpio_version_check() {
     ## cpio 2.13: non bootable on (some?) Android devices
     ## Use 2.12 or 2.15 ir recomendeed
@@ -120,6 +109,17 @@ fn_cpio_version_check() {
         done
         [ "${cpio_bin_found}" == "True" ] && message "cpio ${file} selected!" || abort "No vaiid cpio bin found!"
     fi
+}
+
+fn_initram_uncompress() {
+## TODO
+     initram="$(echo ${initram} | awk -F'.' '{print $1}')"
+    file_is_compressed=$(file ${initram} | grep -c "gzip")
+    if [ "${file_is_compressed}" -eq "1" ]; then
+        initram="${initram}.gz"
+        gunzip "${initram}"
+    fi
+    cd ${INPUT_MKBOOT_DIR}
 }
 
 fn_initram_repack() {
