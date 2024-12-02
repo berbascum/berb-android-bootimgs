@@ -92,7 +92,7 @@ fn_initram_get_skel() {
     rm -rf ${tmpdir}
 }
 
-fn_initram_unpack() {
+fn_initram_uncompress() {
 ## TODO
      initram="$(echo ${initram} | awk -F'.' '{print $1}')"
     file_is_compressed=$(file ${initram} | grep -c "gzip")
