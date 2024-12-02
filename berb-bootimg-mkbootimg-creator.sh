@@ -122,6 +122,28 @@ fn_initram_uncompress() {
     cd ${INPUT_MKBOOT_DIR}
 }
 
+fn_bootimage_get_from_part() {
+    tmpdir="$(mktemp -d)"
+    ## Get the image from the boot partition
+    BOOT_PART="/dev/disk/by-partlabel/boot"
+    if [ -e "${BOOT_PART}" ]; then
+        sudo dd if="${BOOT_PART}" of=${tmpdir}/boot.img
+        sudo chown $(whoami): ${tmpdir}/boot.img
+    else
+        echo "Boot part \"${BOOT_PART}\" not exist"
+        exit 1
+    fi
+    cd ${tmpdir}
+    unpack_bootimg --boot_img boot.img --out ./ > boot.cfg
+    KERNEL_BOOTIMAGE_CMDLINE="$( grep "command line args"  boot.cfg | awk -F': ' '{print $2}')"
+
+
+
+    exit
+
+
+}
+
 fn_initram_repack() {
     ## Check that initram extracted dir exists
     [ -e "${EXTRACTED_INITRAM_DIR}" ] || abort "The extracted initram dir not exist!"
@@ -169,6 +191,7 @@ fn_mkbootimg() {
 
 ## Script execution
 fn_mkboot_conf_global
+fn_bootimage_get_from_part
 if [ "${action}" == "build-initram" ]; then
     fn_cpio_version_check
     fn_initram_repack
