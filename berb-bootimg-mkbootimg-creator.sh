@@ -45,20 +45,35 @@ source ./mkbootimg-config-${DEVICE_TARGET}.sh
 ## Set action var
 action="$2"
 
-## Global vars
-fn_mkboot_conf_global() {
+fn_bootimage_get_from_part() {
+    BOOTIMG_FILES_DIR="$(mktemp -d)"
+    ## Get the image from the boot partition
+    BOOT_PART="/dev/disk/by-partlabel/boot"
+    if [ -e "${BOOT_PART}" ]; then
+        sudo dd if="${BOOT_PART}" of=${BOOTIMG_FILES_DIR}/boot.img
+        sudo chown $(whoami): ${BOOTIMG_FILES_DIR}/boot.img
+    else
+        echo "Boot part \"${BOOT_PART}\" not exist"
+        exit 1
+    fi
+    cd ${BOOTIMG_FILES_DIR}
+    unpack_bootimg --boot_img boot.img --out ./ > boot.cfg
+    KERNEL_BOOTIMAGE_CMDLINE="$( grep "command line args"  boot.cfg | awk -F': ' '{print $2}')"
+}
+
+fn_mkboot_image_config() {
     ## Arguments definition for mkbootimg
     ## Paths
     ## kernel
-    MKBOOTIMG_KERNEL_ARG="--kernel ${INPUT_MKBOOT_DIR}/${kernel}"
+    MKBOOTIMG_KERNEL_ARG="--kernel ${BOOTIMG_FILES_DIR}/kernel"
     MKBOOTIMG_KERNEL_OFFSET_ARG="--kernel_offset $KERNEL_OFFSET"
     MKBOOTIMG_TAGS_OFFSET_ARG="--tags_offset $TAGS_OFFSET"
     MKBOOTIMG_OS_PATCH_LVL_ARG="--os_patch_level ${OS_PATCH_LVL}"
     ## dtb
-    MKBOOTIMG_DTB_ARG="--dtb ${INPUT_MKBOOT_DIR}/${dtb}"
+    MKBOOTIMG_DTB_ARG="--dtb ${BOOTIMG_FILES_DIR}/dtb"
     MKBOOTIMG_DTB_OFFSET_ARG="--dtb_offset $DTB_OFFSET"
     ## ramdisk
-    MKBOOTIMG_RAMDISK_ARG="--ramdisk ${INPUT_MKBOOT_DIR}/${initram}"
+    MKBOOTIMG_RAMDISK_ARG="--ramdisk ${BOOTIMG_FILES_DIR}/ramdisk"
     MKBOOTIMG_RAMDISK_OFFSET_ARG="--ramdisk_offset $INITRAMFS_OFFSET"
     ## other offssets
     MKBOOTIMG_BASE_ARG="--base $BASE_OFFSET"
@@ -67,29 +82,26 @@ fn_mkboot_conf_global() {
     ## Boot config
     MKBOOTIMG_CMDLINE_ARG="--cmdline \"$KERNEL_BOOTIMAGE_CMDLINE\""
     MKBOOTIMG_HEADER_VER_ARG="--header_version $KERNEL_BOOTIMAGE_VERSION"
-    MKBOOTIMG_OUT_IMG_ARG="-o ${INPUT_MKBOOT_DIR}/${MKBOOTIMG_OUT_IMG}"
+    ## MKBOOTIMG_OUT_IMG_ARG= denined by fn_mkbootmg 
 }
 
 fn_initram_get_skel() {
-    ## Check that initram extracted dir exists
-    [ -e "${EXTRACTED_INITRAM_DIR}" ] && \
-        mv ${EXTRACTED_INITRAM_DIR} ${EXTRACTED_INITRAM_DIR}_$(date +%y%m%d_%H%M%S)
-    [ -e "${EXTRACTED_INITRAM_DIR}" ] || \
-        mkdir "${EXTRACTED_INITRAM_DIR}"
-    tmpdir=$(mktemp -d)
+    [ -n "${BOOTIMG_FILES_DIR}" ] || BOOTIMG_FILES_DIR=$(mktemp -d)
+    EXTRACTED_INITRAM_DIR="${BOOTIMG_FILES_DIR}/extracted-initram"
+    sudo mkdir ${EXTRACTED_INITRAM_DIR}
+    sudo chown $(whoami):  ${EXTRACTED_INITRAM_DIR}
+    cd ${EXTRACTED_INITRAM_DIR}
     echo "Downloading ${INITRAM_SKEL_IMG}..."
-    wget -q -O ${tmpdir}/${INITRAM_SKEL_IMG} ${INITRAM_SKEL_URL}/${INITRAM_SKEL_IMG}
-    cd "${EXTRACTED_INITRAM_DIR}"
+    wget -q ${INITRAM_SKEL_URL}/${INITRAM_SKEL_IMG}
     echo "Extracting the initram skel..."
-    gunzip -c ${tmpdir}/${INITRAM_SKEL_IMG} | cpio -i
-    rm -f "${tmpdir}/${INITRAM_SKEL_IMG}"
+    gunzip -c ${INITRAM_SKEL_IMG} | cpio -i
+    rm -f ${INITRAM_SKEL_IMG}
     echo "Downloading initram boot scripts..."
-    cd "${tmpdir}"
+    cd "${BOOTIMG_FILES_DIR}"
     git clone -b ${INITRAM_BOOTSCRIPTS_BRANCH} ${INITRAM_BOOTSCRIPTS_URL}
     rm -rf initramfs-droidian-boot-scripts/.git
-    cp -av initramfs-droidian-boot-scripts/* ${START_DIR}/${EXTRACTED_INITRAM_DIR}
+    cp -av initramfs-droidian-boot-scripts/* ${EXTRACTED_INITRAM_DIR}
     cd "${START_DIR}"
-    rm -rf ${tmpdir}
 }
 
 fn_cpio_version_check() {
@@ -111,6 +123,26 @@ fn_cpio_version_check() {
     fi
 }
 
+fn_initram_repack() {
+    in_initram_dir="${EXTRACTED_INITRAM_DIR}"
+    out_initram_dir="${BOOTIMG_FILES_DIR}"
+    out_initram_file="ramdisk"
+    ## Check that initram extracted dir exists
+    [ -e "${in_initram_dir}" ] || abort "The extracted initram dir not exist!"
+    [ -e "${out_initram_dir}" ] || abort "The out dir not exist!"
+    mv ${out_initram_dir}/ramdisk ${out_initram_dir}/ramdisk_orig
+    cd ${in_initram_dir}
+    echo && echo "Creating initramfs imatge with cpio..."
+    # cpio [--dereference?]
+    ## Build initram image
+    find ./ -not -path "./.git/*" | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${out_initram_dir}/${out_initram_file}
+    echo && echo "${out_initram_dir}/${out_initram_file} created"
+}
+
+#fn_images_to_include_search() {
+    ## Check for files to include
+#}
+
 fn_initram_uncompress() {
 ## TODO
      initram="$(echo ${initram} | awk -F'.' '{print $1}')"
@@ -122,56 +154,20 @@ fn_initram_uncompress() {
     cd ${INPUT_MKBOOT_DIR}
 }
 
-fn_bootimage_get_from_part() {
-    tmpdir="$(mktemp -d)"
-    ## Get the image from the boot partition
-    BOOT_PART="/dev/disk/by-partlabel/boot"
-    if [ -e "${BOOT_PART}" ]; then
-        sudo dd if="${BOOT_PART}" of=${tmpdir}/boot.img
-        sudo chown $(whoami): ${tmpdir}/boot.img
-    else
-        echo "Boot part \"${BOOT_PART}\" not exist"
-        exit 1
-    fi
-    cd ${tmpdir}
-    unpack_bootimg --boot_img boot.img --out ./ > boot.cfg
-    KERNEL_BOOTIMAGE_CMDLINE="$( grep "command line args"  boot.cfg | awk -F': ' '{print $2}')"
-
-
-
-    exit
-
-
-}
-
-fn_initram_repack() {
-    ## Check that initram extracted dir exists
-    [ -e "${EXTRACTED_INITRAM_DIR}" ] || abort "The extracted initram dir not exist!"
-    out_initram_dir="${INPUT_MKBOOT_DIR}"
-    out_initram_file="${initram}"
-    cd ${EXTRACTED_INITRAM_DIR}
-    echo && echo "Creating initramfs imatge with cpio..."
-    # cpio [--dereference?]
-    ## Build initram image
-    sudo rm -f ${START_DIR}/${INPUT_MKBOOT_DIR}/${out_initram_file}
-    find ./ -not -path "./.git/*" | sudo cpio -o -R 0:0 --format='newc' | gzip -9 > ${START_DIR}/${out_initram_dir}/${out_initram_file}
-    echo && echo "${START_DIR}/${out_initram_dir}/${out_initram_file} created"
-}
-
-#fn_images_to_include_search() {
-    ## Check for files to include
-#}
-
 fn_mkbootimg() {
-## Check the boot files dir
+    INPUT_MKBOOT_DIR="${BOOTIMG_FILES_DIR}"
+    OUTPUT_MKBOOT_DIR="${BOOTIMG_FILES_DIR}"
+    INPUT_BOOT_IMAGE="boot.img"
+    OUTPUT_BOOT_IMAGE="boot.img_new"
+    MKBOOTIMG_OUT_IMG_ARG="-o ${OUTPUT_MKBOOT_DIR}/${OUTPUT_BOOT_IMAGE}"
+    ## Check the boot files dir
     [ -d "${INPUT_MKBOOT_DIR}" ] || \
         abort "Dir ${INPUT_MKBOOT_DIR} not found!"
     ## Image creation
-    sudo rm ${INPUT_MKBOOT_DIR}/${MKBOOTIMG_OUT_IMG}
-    echo; echo "Creating \" ${INPUT_MKBOOT_DIR}/${MKBOOTIMG_OUT_IMG} \" boot image..."
-    [ -e "${INPUT_MKBOOT_DIR}/${kernel}" ] || abort "The image file \"${kernel}\" does not eist!" #&& echo "benne"
-    [ -e "${INPUT_MKBOOT_DIR}/${initram}" ] || abort "The image file \"${initram}\" does not eist!" #&& echo "benne"
-    [ -e "${INPUT_MKBOOT_DIR}/${dtb}" ] || abort "The image file \"${dtb}\" does not eist!" #&& echo "benne"
+    [ -e "${INPUT_MKBOOT_DIR}/kernel" ] || abort "The image file \"kernel\" does not eist!" #&& echo "benne"
+    [ -e "${INPUT_MKBOOT_DIR}/ramdisk" ] || abort "The image file \"ramdisk\" does not eist!" #&& echo "benne"
+    [ -e "${INPUT_MKBOOT_DIR}/dtb" ] || abort "The image file \"dtb\" does not eist!" #&& echo "benne"
+    echo; echo "Creating \" ${OUTPUT_MKBOOT_DIR}/${OUTPUT_BOOT_IMAGE} \" boot image..."
     eval mkbootimg \
 	${MKBOOTIMG_KERNEL_ARG} \
 	${MKBOOTIMG_DTB_ARG} \
@@ -188,11 +184,23 @@ fn_mkbootimg() {
 	${MKBOOTIMG_OUT_IMG_ARG}
 }
 
+fn_flash_bootimage() {
+    echo && read -p "Flash the bootimage to the partition \"${BOOT_PART}\"? [ yes | any ]: " answer
+    if [ "${answer}" == "yes" ]; then
+        sudo dd if=${BOOTIMG_FILES_DIR}/${OUTPUT_BOOT_IMAGE} of="${BOOT_PART}"
+    fi
+}
 
 ## Script execution
-fn_mkboot_conf_global
-fn_bootimage_get_from_part
-if [ "${action}" == "build-initram" ]; then
+if [ "${action}" == "initram-upgrade-bootpart" ]; then
+    fn_bootimage_get_from_part
+    fn_mkboot_image_config
+    fn_cpio_version_check
+    fn_initram_get_skel
+    fn_initram_repack
+    fn_mkbootimg
+    fn_flash_bootimage
+elif [ "${action}" == "build-initram" ]; then
     fn_cpio_version_check
     fn_initram_repack
 elif [ "${action}" == "build-boot" ]; then
@@ -209,4 +217,5 @@ else
     echo "  \" build-boot \": Builds the boot image with the files in exttracted-boot dir."
     echo "  \" build-initram \": Repacks the initram using the content on extracted-boot/extracted-ramdisk"
     echo "  \" initram-get-skel \": Downloads a initramfs image as template and updates the boot scripts"
+    echo "  \" initram-upgrade-bootpart \": Extracts the boot.img from boot partition, dounload a initram skel, update initram bootscripts, rebuuild the boot.img, and flash them."
 fi
